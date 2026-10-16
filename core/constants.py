@@ -1,13 +1,25 @@
 from enum import Enum
 
+
 class Direction(Enum):
-    UP = 0
-    DOWN = 1
-    LEFT = 2
-    RIGHT = 3
+    UP = (-1, 0)
+    DOWN = (1, 0)
+    LEFT = (0, -1)
+    RIGHT = (0, 1)
+
+    @property
+    def dr(self) -> int:
+        """Độ lệch hàng (delta row)."""
+        return self.value[0]
+
+    @property
+    def dc(self) -> int:
+        """Độ lệch cột (delta column)."""
+        return self.value[1]
+
 
 class Action(Enum):
-    # 4 hành động khi khối nguyên vẹn
+    # 4 hành động khi khối nguyên vẹn (1x1x2)
     UP = (None, Direction.UP)
     DOWN = (None, Direction.DOWN)
     LEFT = (None, Direction.LEFT)
@@ -25,7 +37,7 @@ class Action(Enum):
     SPLIT_1_RIGHT = (1, Direction.RIGHT)
 
     @property
-    def cube_index(self):
+    def cube_index(self) -> int | None:
         """Trả về None nếu là khối nguyên, trả về 0 hoặc 1 nếu đang SPLIT."""
         return self.value[0]
 
@@ -39,23 +51,26 @@ class Action(Enum):
         """Hàm helper tiện ích cho GUI: truyền hướng và index cục -> lấy Action."""
         return cls((cube_index, direction))
 
+
 class Orientation(Enum):
     STANDING = 0     # Đứng thẳng 1 ô
     HORIZONTAL = 1   # Nằm ngang (chiếm 2 ô theo trục c)
     VERTICAL = 2     # Nằm dọc (chiếm 2 ô theo trục r)
-    SPLIT = 3        # tách làm 2 bởi split_switch
+    SPLIT = 3        # Tách làm hai khối 1x1x1 bởi split_switch
+
 
 class TileType(Enum):
-    VOID = 0
-    FLOOR = 1
-    GOAL = 2
-    FRAGILE = 3         # gạch cam
-    SOFT_SWITCH = 4     # công tắc tròn
-    HEAVY_SWITCH = 5    # công tắc X
-    SPLIT_SWITCH = 6    # Công tắc ()
-    BRIDGE = 7          # Cầu 
-class SwitchBehavior(Enum):
+    VOID = 0            # Khoảng không (rơi)
+    FLOOR = 1           # Sàn bình thường
+    GOAL = 2            # Lỗ đích
+    FRAGILE = 3         # Gạch cam (đứng thẳng lên là vỡ)
+    SOFT_SWITCH = 4     # Công tắc tròn (chạm nhẹ là ăn)
+    HEAVY_SWITCH = 5    # Công tắc X (đứng thẳng mới ăn)
+    SPLIT_SWITCH = 6    # Công tắc () (đứng thẳng thì tách đôi khối)
+    BRIDGE = 7          # Cầu (trạng thái đóng/mở lưu ở State.active_bridges)
 
+
+class SwitchBehavior(Enum):
     TOGGLE = 0             # Đảo trạng thái cầu
     PERMANENT_OPEN = 1     # Chỉ mở cầu, đã mở thì không đóng lại được nữa
     PERMANENT_CLOSE = 2    # Chỉ đóng cầu
