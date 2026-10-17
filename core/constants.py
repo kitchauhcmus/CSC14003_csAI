@@ -53,20 +53,19 @@ class Action(Enum):
 
 
 class Orientation(Enum):
-    STANDING = 0     # Đứng thẳng 1 ô
+    STANDING = 0     # đứng thẳng
     HORIZONTAL = 1   # Nằm ngang (chiếm 2 ô theo trục c)
     VERTICAL = 2     # Nằm dọc (chiếm 2 ô theo trục r)
-    SPLIT = 3        # Tách làm hai khối 1x1x1 bởi split_switch
-
+    SPLIT = 3        # tách làm hai khối
 
 class TileType(Enum):
-    VOID = 0            # Khoảng không (rơi)
-    FLOOR = 1           # Sàn bình thường
-    GOAL = 2            # Lỗ đích
-    FRAGILE = 3         # Gạch cam (đứng thẳng lên là vỡ)
-    SOFT_SWITCH = 4     # Công tắc tròn (chạm nhẹ là ăn)
-    HEAVY_SWITCH = 5    # Công tắc X (đứng thẳng mới ăn)
-    SPLIT_SWITCH = 6    # Công tắc () (đứng thẳng thì tách đôi khối)
+    VOID = 0
+    FLOOR = 1
+    GOAL = 2
+    FRAGILE = 3         # Gạch cam
+    SOFT_SWITCH = 4     # Công tắc tròn
+    HEAVY_SWITCH = 5    # Công tắc X
+    SPLIT_SWITCH = 6    # Công tắc ()
     BRIDGE = 7          # Cầu (trạng thái đóng/mở lưu ở State.active_bridges)
 
 
