@@ -7,7 +7,6 @@ import multiprocessing
 def main():
     parser = argparse.ArgumentParser(description="Bloxorz 3D Solver Lab")
     parser.add_argument("--level", help="Path to a Board JSON level")
-    parser.add_argument("--focus", action="store_true", help="Start with the 3D board filling the window (F toggles controls)")
     parser.add_argument("--screenshot", metavar="PNG", help="Render an offscreen screenshot and exit")
     args = parser.parse_args()
     try:
@@ -18,8 +17,6 @@ def main():
         raise
     app = BloxorzApp(args.level, offscreen=bool(args.screenshot))
     try:
-        if args.focus:
-            app.toggle_focus()
         if args.screenshot:
             print(app.screenshot(args.screenshot))
         else:

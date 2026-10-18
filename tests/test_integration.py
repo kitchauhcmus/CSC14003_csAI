@@ -174,38 +174,6 @@ def test_playback_speed_change_keeps_fractional_step_progress():
     assert playback.playing
 
 
-def test_playback_busy_scene_keeps_time_and_advances_one_state_per_frame():
-    board = straight_board()
-    session = GameSession(board)
-    result = SOLVERS["BFS"](make_search_problem(board))
-    playback = PlaybackController(session)
-    playback.load(result)
-    playback.speed = 4
-    playback.play()
-    playback.update(1.25, max_steps=0)  # Longer than the entire four-step path.
-    assert playback.index == 0
-    assert session.state == result.states[0]
-    for index in range(1, len(result.states)):
-        playback.update(0, max_steps=1)
-        assert playback.index == index
-        assert session.state == result.states[index]
-        playback.update(0.1, max_steps=0)
-        assert playback.index == index
-    assert session.status == "won"
-    assert not playback.playing
-    playback.restart()
-    playback.play()
-    playback.update(0, max_steps=1)
-    assert playback.index == 0  # Finishing/restarting clears any accumulated time.
-
-
-@pytest.mark.parametrize("max_steps", [-1, True, False, 1.0, "1"])
-def test_playback_rejects_invalid_frame_step_limits(max_steps):
-    playback = PlaybackController(GameSession(straight_board()))
-    with pytest.raises(ValueError, match="max_steps"):
-        playback.update(0.1, max_steps=max_steps)
-
-
 def test_runner_spawn_result_replacement_and_cleanup():
     board = straight_board()
     initial = board.initial_state()

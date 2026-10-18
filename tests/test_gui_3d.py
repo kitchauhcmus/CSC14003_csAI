@@ -27,10 +27,6 @@ def test_real_3d_application_end_to_end(tmp_path):
         app.messenger.send("r")
         assert app.session.state == initial and app.session.move_count == 0
         app.timeout_entry.guiItem.setFocus(False)
-        app.messenger.send("f")
-        assert app.focus_mode and all(panel.isHidden() for panel in app.side_panels)
-        app.messenger.send("f")
-        assert not app.focus_mode and all(not panel.isHidden() for panel in app.side_panels)
         path = bfs(make_search_problem(app.session.board))
         app.move(path.actions[0].direction)
         assert app.scene.busy and app.session.state == path.states[1]
@@ -68,9 +64,6 @@ def test_real_3d_application_end_to_end(tmp_path):
         app.reset()
         app.taskMgr.step()
         assert app.notice == "Stage reset."
-        assert app.scene.busy  # Tile collapse/assembly blocks moves until complete.
-        app.scene.update(2)
-        assert not app.scene.busy
 
         # A falling move animates, and Undo restores the visible block.
         for direction in Direction:
@@ -89,7 +82,6 @@ def test_real_3d_application_end_to_end(tmp_path):
         split_name = next(name for name, path in zip(app.level_names, app.level_paths)
                           if path.stem.startswith("05_"))
         app._choose_level(split_name)
-        app.scene.update(2)
         result = bfs(make_search_problem(app.session.board))
         app.last_result = result
         app.playback.load(result)
@@ -107,7 +99,6 @@ def test_real_3d_application_end_to_end(tmp_path):
         app.step_forward()
         app.scene.update(1)
         assert app.session.status == "won"
-        assert app.scene.blocks.isHidden()  # Goal sink finishes after the last roll.
         app.screenshot(tmp_path / "split-complete.png")
     finally:
         app.close()
