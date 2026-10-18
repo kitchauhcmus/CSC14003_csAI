@@ -5,3 +5,7 @@ __pycache__/
 .idea/
 venv/
 env/
+.venv/
+.pytest_cache/
+exports/
+artifacts/

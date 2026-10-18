@@ -1,6 +1,23 @@
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import Any, Iterable
 from core.constants import Orientation
+
+
+def is_strict_int(value: Any) -> bool:
+    """Coordinates accept integers, never bool, floats or numeric strings."""
+    return type(value) is int
+
+
+def strict_int(value: Any, context: str = "value") -> int:
+    if not is_strict_int(value):
+        raise ValueError(f"{context} must be an integer, got {value!r}.")
+    return value
+
+
+def _coord(value: Any) -> tuple[int, int]:
+    if not isinstance(value, (tuple, list)) or len(value) != 2:
+        raise ValueError(f"Expected a coordinate pair, got {value!r}.")
+    return strict_int(value[0], "row"), strict_int(value[1], "column")
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +50,14 @@ class State:
     active_bridges: frozenset[tuple[int, int]] = field(default_factory=frozenset)
 
     def __post_init__(self):
+        if not isinstance(self.orientation, Orientation):
+            raise ValueError("orientation must be an Orientation.")
+        if not isinstance(self.positions, tuple) or not isinstance(self.active_bridges, frozenset):
+            raise ValueError("State requires tuple positions and frozenset bridges; use State.make().")
+        for position in (*self.positions, *self.active_bridges):
+            if not isinstance(position, tuple):
+                raise ValueError("State coordinates must be tuples; use State.make().")
+            _coord(position)
         # Chuẩn hóa thứ tự tọa độ (chỉ sort tối đa 2 phần tử)
         if (
             isinstance(self.positions, tuple)
@@ -41,10 +66,11 @@ class State:
         ):
             object.__setattr__(self, "positions", (self.positions[1], self.positions[0]))
 
-        assert self._is_valid_invariant(), (
-            f"Invalid state invariant: orientation={self.orientation}, "
-            f"positions={self.positions}, active_bridges={self.active_bridges}"
-        )
+        if not self._is_valid_invariant():
+            raise ValueError(
+                f"Invalid state invariant: orientation={self.orientation}, "
+                f"positions={self.positions}, active_bridges={self.active_bridges}"
+            )
 
     def _is_valid_invariant(self) -> bool:
         """Kiểm tra tính toàn vẹn kiểu dữ liệu và tính nhất quán hình học."""
@@ -81,8 +107,11 @@ class State:
         active_bridges: Iterable[tuple[int, int]] = (),
     ) -> "State":
         """Factory method chuẩn hóa kiểu dữ liệu đầu vào về tuple và frozenset."""
-        pos_tuple = tuple((int(r), int(c)) for r, c in positions)
-        bridges_frozenset = frozenset((int(r), int(c)) for r, c in active_bridges)
+        try:
+            pos_tuple = tuple(_coord(position) for position in positions)
+            bridges_frozenset = frozenset(_coord(position) for position in active_bridges)
+        except TypeError as exc:
+            raise ValueError("Positions and bridges must be coordinate iterables.") from exc
         return cls(
             positions=pos_tuple,
             orientation=orientation,
