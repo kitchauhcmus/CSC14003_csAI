@@ -63,11 +63,12 @@ class BloxorzApp(ShowBase):
         self.playback = PlaybackController(self.session)
         self.algorithm = "BFS"
         self.last_result = None
-        self.notice = "Ready. Roll the block upright into the green goal."
+        self.notice = "Ready. Roll the block upright into the square goal."
         self.notice_error = False
         self._search_started = 0.0
         self._closed = False
         self._drag = None
+        self.focus_mode = False
         self._ui_ready = False
         self._ui()
         self._bind_keys()
@@ -107,6 +108,7 @@ class BloxorzApp(ShowBase):
         left = DirectFrame(parent=self.a2dTopLeft, frameSize=(0, .78, -2, 0), frameColor=PANEL)
         right = DirectFrame(parent=self.a2dTopRight, pos=(-.66, 0, 0),
                             frameSize=(0, .66, -2, 0), frameColor=PANEL)
+        self.side_panels = (left, right)
         self._label(left, "CSC14003  /  AI LAB", .075, -.095, .027, ACCENT)
         self._label(left, "BLOXORZ", .07, -.245, .082)
         self._label(left, "3D SOLVER", .075, -.335, .052, MUTED)
@@ -129,7 +131,7 @@ class BloxorzApp(ShowBase):
         self._button(left, "Reset [R]", .555, -1.39, .30, self.reset)
         self.split_button = self._button(left, "Switch cube [Tab]", .39, -1.52, .63, self.select_cube)
         self._label(left, "CAMERA", .075, -1.66, .027, ACCENT)
-        self._label(left, "Q / E   Orbit     Wheel   Zoom\nRight drag   Orbit / tilt\nC   Reset view", .075, -1.74, .029, MUTED,
+        self._label(left, "Q / E   Orbit     Wheel   Zoom\nRight drag   Orbit / tilt\nC   Reset view     F   Focus", .075, -1.74, .029, MUTED,
                     text_wordwrap=24)
         self._label(left, "Built in Python + Panda3D", .075, -1.95, .023, MUTED)
 
@@ -172,6 +174,10 @@ class BloxorzApp(ShowBase):
         self.export_button = self._button(right, "Export result JSON", .33, -1.92, .55, self.export_result)
         self.header = self._label(self.aspect2d, "", -.06, .86, .047)
         self.subheader = self._label(self.aspect2d, "", -.06, .79, .026, MUTED)
+        self.focus_return = self._button(self.a2dTopRight, "Controls [F]", -.22, -.10, .33, self.toggle_focus)
+        self.focus_moves = self._label(self.a2dTopLeft, "", .08, -.12, .04)
+        self.focus_return.hide()
+        self.focus_moves.hide()
         self.status_label = DirectLabel(parent=self.aspect2d, text="", pos=(.06, 0, -.86),
                                         text_scale=.034, text_fg=INK, text_wordwrap=43,
                                         frameColor=(0, 0, 0, 0), textMayChange=True)
@@ -204,6 +210,7 @@ class BloxorzApp(ShowBase):
                               ("c", self.scene.reset_camera), ("escape", self.cancel_search)):
             self.accept(key, callback if key in ("enter", "escape") else self._key,
                         [] if key in ("enter", "escape") else [callback])
+        self.accept("f", self._key, [self.toggle_focus])
         self.accept("q", self._key, [self.scene.orbit, -15])
         self.accept("e", self._key, [self.scene.orbit, 15])
         self.accept("wheel_up", self.scene.zoom_by, [.9])
@@ -217,6 +224,14 @@ class BloxorzApp(ShowBase):
     def _key(self, callback, *args):
         if not self._typing():
             callback(*args)
+
+    def toggle_focus(self):
+        self.focus_mode = not self.focus_mode
+        for panel in self.side_panels:
+            panel.hide() if self.focus_mode else panel.show()
+        for widget in (self.focus_return, self.focus_moves):
+            widget.show() if self.focus_mode else widget.hide()
+        self._resize(self.win)
 
     def _set_notice(self, text, error=False):
         self.notice, self.notice_error = text, error
@@ -274,7 +289,7 @@ class BloxorzApp(ShowBase):
         self.session.reset()
         self._clear_playback()
         self.last_result = None
-        self.scene.set_state(self.session.state, self.session.selected_position)
+        self.scene.restart(self.session.state, self.session.selected_position)
         self._set_notice("Stage reset.")
 
     def undo(self):
@@ -377,7 +392,7 @@ class BloxorzApp(ShowBase):
             # Dragging starts only inside the scene, avoiding UI controls.
             aspect = self.getAspectRatio()
             x = point.x*aspect
-            if -aspect+.78 < x < aspect-.66:
+            if self.focus_mode or -aspect+.78 < x < aspect-.66:
                 self._drag = (point.x, point.y)
 
     def _stop_drag(self):
@@ -390,10 +405,12 @@ class BloxorzApp(ShowBase):
         aspect = width / height
         # UI sidebars keep a constant height-relative width; the 3D viewport
         # occupies the actual remaining space, with a matching camera aspect.
-        left = min(.40, .78/(2*aspect))
-        right = max(.60, 1-.66/(2*aspect))
-        self.camNode.getDisplayRegion(0).setDimensions(left, right, .08, .90)
-        self.camLens.setAspectRatio(width*(right-left)/(height*.82))
+        left = 0 if self.focus_mode else min(.40, .78/(2*aspect))
+        right = 1 if self.focus_mode else max(.60, 1-.66/(2*aspect))
+        bottom, top = (0, 1) if self.focus_mode else (.08, .90)
+        self.camNode.getDisplayRegion(0).setDimensions(left, right, bottom, top)
+        self.camLens.setAspectRatio(width*(right-left)/(height*(top-bottom)))
+        self.scene.update_camera()
         self.header.setPos(.06, 0, .88)
         self.header["text_align"] = TextNode.ACenter
         self.subheader.setPos(.06, 0, .81)
@@ -402,9 +419,10 @@ class BloxorzApp(ShowBase):
     def _refresh(self):
         board = self.session.board
         self.header["text"] = board.name
-        self.subheader["text"] = "3D BOARD  /  " + str(board.rows) + " x " + str(board.cols)
+        self.subheader["text"] = "ORTHOGRAPHIC 3D  /  " + str(board.rows) + " x " + str(board.cols)
         self.stage_info["text"] = f"{board.rows} rows x {board.cols} columns\nArrow keys or W A S D to move"
         self.move_label["text"] = f"{self.session.move_count:02d}"
+        self.focus_moves["text"] = f"Moves: {self.session.move_count:02d}"
         self.mode_label["text"] = self.session.status.upper()
         self.mode_label["text_fg"] = ACCENT if self.session.status == "won" else MUTED
         self.status_label["text"] = self.notice
@@ -467,7 +485,7 @@ class BloxorzApp(ShowBase):
         if self.playback.playing:
             previous, index = self.session.state, self.playback.index
             try:
-                self.playback.update(dt)
+                self.playback.update(dt, max_steps=0 if self.scene.busy else 1)
                 if previous != self.session.state:
                     action = self.last_result.actions[index] if self.last_result else None
                     self.scene.transition(previous, self.session.state, self.session.selected_position, action)
@@ -491,9 +509,11 @@ class BloxorzApp(ShowBase):
         self.close()
         raise SystemExit(0)
 
-    def screenshot(self, path):
+    def screenshot(self, path, *, settle=True):
         path = Path(path).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
+        if settle:
+            self.scene.update(3)
         for _ in range(4):
             self.taskMgr.step()
             self.graphicsEngine.renderFrame()

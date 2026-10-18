@@ -111,14 +111,24 @@ class PlaybackController:
         self.session._restore(self._snapshots[0])
         self.session._history.clear()
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, max_steps: int | None = None) -> None:
+        """Advance time while optionally limiting transitions per render frame.
+
+        A busy scene can pass zero to retain elapsed playback time without
+        changing the model; unused time remains available on subsequent frames.
+        """
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("Frame time must be a finite nonnegative number")
+        if max_steps is not None and (type(max_steps) is not int or max_steps < 0):
+            raise ValueError("max_steps must be a nonnegative integer or None")
         if not self.playing:
             return
         self._elapsed += dt
         interval = 1.0 / self.speed
-        while self.playing and self._elapsed >= interval:
+        steps = 0
+        while (self.playing and self._elapsed >= interval
+               and (max_steps is None or steps < max_steps)):
             self._elapsed -= interval
             if not self.step_forward():
                 break
+            steps += 1
