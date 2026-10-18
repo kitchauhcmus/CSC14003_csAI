@@ -70,6 +70,19 @@ class Board:
     Hỗ trợ đầy đủ pickle để chạy benchmark đa tiến trình (multiprocessing).
     """
 
+    __slots__ = (
+        "grid", "rows", "cols", "start_pos", "goal_pos", "initial_bridges",
+        "switches", "split_switches", "name", "lint_warnings", "_frozen",
+    )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if getattr(self, "_frozen", False):
+            raise AttributeError("Board is immutable; create a new Board for another level.")
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("Board is immutable.")
+
     def __init__(
         self,
         grid: Iterable[Iterable[TileType]],
@@ -146,19 +159,22 @@ class Board:
         self.lint_warnings: tuple[str, ...] = ()
 
         self._validate_board()
+        object.__setattr__(self, "_frozen", True)
 
     def __getstate__(self) -> dict[str, Any]:
         """Chuyển MappingProxyType về dict thường khi pickle (hỗ trợ multiprocessing)."""
-        state = self.__dict__.copy()
+        state = {name: getattr(self, name) for name in self.__slots__ if name != "_frozen"}
         state["switches"] = dict(self.switches)
         state["split_switches"] = dict(self.split_switches)
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Khôi phục lại MappingProxyType sau khi unpickle."""
-        state["switches"] = MappingProxyType(state["switches"])
-        state["split_switches"] = MappingProxyType(state["split_switches"])
-        self.__dict__.update(state)
+        for name, value in state.items():
+            if name in ("switches", "split_switches"):
+                value = MappingProxyType(dict(value))
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "_frozen", True)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Board):
