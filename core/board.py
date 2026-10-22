@@ -144,7 +144,7 @@ class Board:
         self.split_switches: Mapping[tuple[int, int], SplitSpec] = MappingProxyType(norm_splits)
         self.name: str = str(name)
         self.lint_warnings: tuple[str, ...] = ()
-
+        self.lint_notes: tuple[str, ...] = ()
         self._validate_board()
 
     def __getstate__(self) -> dict[str, Any]:
@@ -175,8 +175,10 @@ class Board:
 
     def __hash__(self) -> int:
         """
-        Cho phép dùng Board làm key trong dict / set / functools.lru_cache (VD: cache bảng khoảng cách A*).
-        Không cache kết quả vào attribute để an toàn tuyệt đối khi pickle qua các process có PYTHONHASHSEED khác nhau.
+        Hỗ trợ dùng Board trong set/dict. Lưu ý cho Solver: KHÔNG dùng @lru_cache theo Board
+        trên đường nóng, vì mỗi lần gọi phải tính lại hash cả grid (O(rows*cols)); hãy tính bảng
+        khoảng cách một lần trong __init__ của Solver. Không cache hash vào attribute để an toàn
+        khi pickle sang process có PYTHONHASHSEED khác. hash(board) chỉ có nghĩa trong 1 process.
         """
         return hash(
             (
@@ -231,9 +233,9 @@ class Board:
             for sp in split_spec.spawn_positions:
                 if not self.in_bounds(*sp) or self.tile_at(*sp) == TileType.VOID:
                     raise ValueError(f"Invalid split spawn position {sp} for switch at {pos}.")
-                
 
         dead_bridges: list[tuple[int, int]] = []
+        dead_spawns: list[tuple[tuple[int, int], tuple[int, int]]] = []
         risky_notes: list[str] = []
         for r, row in enumerate(self.grid):
             for c, tile in enumerate(row):
@@ -243,18 +245,18 @@ class Board:
                 elif tile == TileType.SPLIT_SWITCH:
                     if (r, c) not in self.split_switches:
                         raise ValueError(f"SPLIT_SWITCH at ({r}, {c}) is missing its SplitSpec.")
-                    # Lint mềm: spawn rơi trên cầu đóng sẵn nhưng CÓ switch mở được.
-                    # Nước đi chỉ khả thi nếu người chơi đã mở cầu từ trước.
                     for sp in self.split_switches[(r, c)].spawn_positions:
-                        if (
-                            self.tile_at(*sp) == TileType.BRIDGE
-                            and sp not in self.initial_bridges
-                            and sp in openable_bridges
-                        ):
+                        if self.tile_at(*sp) != TileType.BRIDGE or sp in self.initial_bridges:
+                            continue
+                        if sp in openable_bridges:
+                            # Đóng sẵn nhưng mở được: chỉ khả thi nếu mở cầu trước. Không chắc là lỗi.
                             risky_notes.append(
                                 f"[{self.name}] Split switch at ({r}, {c}) spawns a cube on bridge {sp} "
                                 f"that is closed initially; only possible if a switch opened it beforehand."
                             )
+                        else:
+                            # Cầu chết vĩnh viễn: dùng split switch này là rơi chắc chắn
+                            dead_spawns.append(((r, c), sp))
                 elif tile == TileType.BRIDGE:
                     if (r, c) not in self.initial_bridges and (r, c) not in openable_bridges:
                         dead_bridges.append((r, c))
@@ -265,11 +267,14 @@ class Board:
                 f"[{self.name}] Permanently impassable bridge tile(s) at {dead_bridges}: "
                 f"closed initially and not targeted by any opening switch."
             )
+            if dead_spawns:
+                detail = ", ".join(f"split switch {s} -> spawn {sp}" for s, sp in dead_spawns)
+                msg += f" Split spawn(s) landing on them (always fall): {detail}."
             hard_warnings.append(msg)
             warnings.warn(msg, UserWarning)
 
-        # risky_notes chỉ lưu để tham khảo, KHÔNG warnings.warn (tránh báo oan)
-        self.lint_warnings = tuple(hard_warnings) + tuple(risky_notes)
+        self.lint_warnings = tuple(hard_warnings)   # lỗi thiết kế chắc chắn
+        self.lint_notes = tuple(risky_notes)        # chỉ là lưu ý, KHÔNG warnings.warn
 
     def in_bounds(self, r: int, c: int) -> bool:
         return 0 <= r < self.rows and 0 <= c < self.cols
