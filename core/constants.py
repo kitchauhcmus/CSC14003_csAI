@@ -71,5 +71,13 @@ class TileType(Enum):
 
 class SwitchBehavior(Enum):
     TOGGLE = 0             # Đảo trạng thái cầu
-    PERMANENT_OPEN = 1     # Chỉ mở cầu, đã mở thì không đóng lại được nữa
-    PERMANENT_CLOSE = 2    # Chỉ đóng cầu
+    PERMANENT_OPEN = 1     # khi kích hoạt luôn đặt cầu về trạng thái mở
+    PERMANENT_CLOSE = 2    # khi kích hoạt luôn đặt cầu về trạng thái đóng
+
+
+class MoveResult(Enum):
+    OK = 0                 # Nước đi hợp lệ
+    FELL_VOID = 1          # Rơi ra ngoài biên hoặc vào ô VOID
+    FRAGILE_BROKE = 2      # Đứng thẳng trên gạch cam làm vỡ gạch
+    BRIDGE_CLOSED = 3      # Đè lên cầu đang đóng (hoặc công tắc vừa làm sập cầu dưới chân)
+    INVALID_ACTION = 4     # Action không khớp trạng thái (VD: action SPLIT khi khối nguyên)
