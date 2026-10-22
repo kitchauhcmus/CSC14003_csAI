@@ -111,3 +111,19 @@ def successors(board: Board, state: State) -> list[tuple[Action, State]]:
         if candidate is not None:
             result.append((action, candidate))
     return result
+
+def is_ touching_fragile(board: Board, state: State) -> bool:
+    """
+    Kiểm tra xem khối hộp ở trạng thái `state` có đang nằm đè lên bất kỳ ô gạch cam
+    (FRAGILE) nào hay không. Hỗ trợ tính hàm chi phí (Cost Function) trong UCS Solver
+    (ví dụ: phạt điểm cao hơn khi đi qua gạch dễ vỡ).
+    """
+    return any(board.tile_at(*pos) == TileType.FRAGILE for pos in state.positions)
+
+
+def did_bridges_change(prev_state: State, next_state: State) -> bool:
+    """
+    Kiểm tra xem nước đi từ `prev_state` sang `next_state` có làm thay đổi trạng thái
+    đóng/mở của bất kỳ cây cầu nào không. Hỗ trợ GUI phát âm thanh/hiệu ứng và hỗ trợ UCS.
+    """
+    return prev_state.active_bridges != next_state.active_bridges
